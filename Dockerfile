@@ -1,27 +1,21 @@
 FROM node:18-alpine
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev for building)
+RUN npm ci
 
-# Copy TypeScript config and source files
-COPY tsconfig.json ./
-COPY src ./src
+# Copy source code
+COPY . .
 
-# Install TypeScript globally for building
-RUN npm install -g typescript
-
-# Build TypeScript
+# Build the application
 RUN npm run build
 
-# Remove dev dependencies and TypeScript after build
-RUN npm prune --production && \
-    npm uninstall -g typescript
+# Remove dev dependencies after build
+RUN npm prune --production
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -33,8 +27,5 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose port (if needed for metrics/health checks)
-EXPOSE 3000
-
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["npm", "start"]

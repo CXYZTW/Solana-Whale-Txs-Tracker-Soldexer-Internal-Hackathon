@@ -1,5 +1,6 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
+  "service": "solana-whale-tracker",
   "build": {
     "builder": "NIXPACKS"
   },
