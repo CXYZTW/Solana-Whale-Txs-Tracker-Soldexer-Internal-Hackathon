@@ -93,20 +93,20 @@ export class TelegramBot {
   private async startOnboarding(ctx: Context, userId: number) {
     this.onboardingState.set(userId, { step: 'welcome', data: {} });
     
-    const welcomeMessage = `🐋 **Welcome to Solana Whale Tracker!**
+    const welcomeMessage = `**Welcome to Solana Whale Tracker**
 
-💰 I'll alert you when large SOL transactions happen on the blockchain.
+I'll alert you when large SOL transactions happen on the blockchain.
 
 Let's set you up in 3 quick steps:
 
-🎯 **Step 1: Choose your alert threshold**
+**Step 1: Choose your alert threshold**
 
 How much should a transaction be worth to alert you?
 
-🔥 Reply **1** for $5,000+ (very active)
-💪 Reply **2** for $25,000+ (balanced)
-🐋 Reply **3** for $100,000+ (whales only)
-🎯 Reply **custom** to set your own amount`;
+Reply **1** for $5,000+ (very active)
+Reply **2** for $25,000+ (balanced)
+Reply **3** for $100,000+ (whales only)
+Reply **custom** to set your own amount`;
     
     await ctx.reply(welcomeMessage, { parse_mode: 'Markdown' });
   }
@@ -296,7 +296,7 @@ How much should a transaction be worth to alert you?
     
     const state = this.onboardingState.get(userId);
     if (!state) {
-      await ctx.reply('🤔 I didn\'t understand that. Type /start to begin or /help for commands.');
+      await ctx.reply('I didn\'t understand that. Type /start to begin or /help for commands.');
       return;
     }
     
@@ -338,10 +338,10 @@ How much should a transaction be worth to alert you?
       case 'custom':
         state.step = 'custom_amount';
         this.onboardingState.set(userId, state);
-        await ctx.reply('🎯 **Custom Threshold**\n\nEnter your desired threshold amount (just the number):\n\n💵 Example: **25000** for $25,000\n🔶 Example: **100** for 100 SOL', { parse_mode: 'Markdown' });
+        await ctx.reply('**Custom Threshold**\n\nEnter your desired threshold amount (just the number):\n\nExample: **25000** for $25,000\nExample: **100** for 100 SOL', { parse_mode: 'Markdown' });
         return;
       default:
-        await ctx.reply('😅 Please reply with **1**, **2**, **3**, or **custom**');
+        await ctx.reply('Please reply with **1**, **2**, **3**, or **custom**');
         return;
     }
     
@@ -349,7 +349,7 @@ How much should a transaction be worth to alert you?
     state.step = 'refresh_choice';
     this.onboardingState.set(userId, state);
     
-    const message = `✅ Great! You\'ll get alerts for ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}+ transactions.\n\n⏱️ **Step 2: How often should I check for new transactions?**\n\n⚡ Reply **fast** for every 5 seconds\n🐌 Reply **normal** for every 15 seconds\n🐢 Reply **slow** for every 30 seconds`;
+    const message = `Great! You\'ll get alerts for ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}+ transactions.\n\n**Step 2: How often should I check for new transactions?**\n\nReply **fast** for every 5 seconds\nReply **normal** for every 15 seconds\nReply **slow** for every 30 seconds`;
     
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
@@ -357,7 +357,7 @@ How much should a transaction be worth to alert you?
   private async handleCustomAmount(ctx: Context, userId: number, input: string, state: any) {
     const amount = parseFloat(input);
     if (isNaN(amount) || amount <= 0) {
-      await ctx.reply('❌ Please enter a valid positive number.');
+      await ctx.reply('Please enter a valid positive number.');
       return;
     }
     
@@ -365,7 +365,7 @@ How much should a transaction be worth to alert you?
     state.step = 'currency_choice';
     this.onboardingState.set(userId, state);
     
-    await ctx.reply(`💰 **${amount.toLocaleString()}** - got it!\n\n🌍 **What currency?**\n\n💵 Reply **usd** for US Dollars\n🔶 Reply **sol** for Solana`, { parse_mode: 'Markdown' });
+    await ctx.reply(`**${amount.toLocaleString()}** - got it!\n\n**What currency?**\n\nReply **usd** for US Dollars\nReply **sol** for Solana`, { parse_mode: 'Markdown' });
   }
   
   private async handleCurrencyChoice(ctx: Context, userId: number, input: string, state: any) {
@@ -376,7 +376,7 @@ How much should a transaction be worth to alert you?
     } else if (input === 'sol' || input === 'solana') {
       currency = 'SOL';
     } else {
-      await ctx.reply('😅 Please reply with **usd** or **sol**');
+      await ctx.reply('Please reply with **usd** or **sol**');
       return;
     }
     
@@ -384,7 +384,7 @@ How much should a transaction be worth to alert you?
     state.step = 'refresh_choice';
     this.onboardingState.set(userId, state);
     
-    const message = `✅ Perfect! Alerts for ${currency === 'USD' ? '$' + state.data.threshold.toLocaleString() : state.data.threshold + ' SOL'}+ transactions.\n\n⏱️ **Step 3: How often should I check for new transactions?**\n\n⚡ Reply **fast** for every 5 seconds\n🐌 Reply **normal** for every 15 seconds\n🐢 Reply **slow** for every 30 seconds`;
+    const message = `Perfect! Alerts for ${currency === 'USD' ? '$' + state.data.threshold.toLocaleString() : state.data.threshold + ' SOL'}+ transactions.\n\n**Step 3: How often should I check for new transactions?**\n\nReply **fast** for every 5 seconds\nReply **normal** for every 15 seconds\nReply **slow** for every 30 seconds`;
     
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
@@ -403,7 +403,7 @@ How much should a transaction be worth to alert you?
         refreshSeconds = 30;
         break;
       default:
-        await ctx.reply('😅 Please reply with **fast**, **normal**, or **slow**');
+        await ctx.reply('Please reply with **fast**, **normal**, or **slow**');
         return;
     }
     
@@ -417,7 +417,7 @@ How much should a transaction be worth to alert you?
     this.onboardingState.delete(userId);
     
     const speedText = input === 'fast' ? 'super fast' : input === 'normal' ? 'balanced' : 'relaxed';
-    const finalMessage = `🎉 **You\'re all set!**\n\n🎯 **Threshold:** ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}\n⏱️ **Speed:** ${speedText} (${refreshSeconds}s)\n🔔 **Alerts:** ON\n\n🚀 **You\'ll now receive whale alerts!**\n\n📊 Use /stats to see activity\n🛑 Use /stop to pause alerts\n🙋 Use /help for more options`;
+    const finalMessage = `**You\'re all set!**\n\n**Threshold:** ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}\n**Speed:** ${speedText} (${refreshSeconds}s)\n**Alerts:** ON\n\n**You\'ll now receive whale alerts!**\n\nUse /stats to see activity\nUse /stop to pause alerts\nUse /help for more options`;
     
     await ctx.reply(finalMessage, { parse_mode: 'Markdown' });
   }
@@ -435,7 +435,7 @@ How much should a transaction be worth to alert you?
     // Disable alerts
     userSettingsService.toggleAlerts(userId, false);
     
-    const message = `🛑 **Alerts Stopped**\n\nYou will no longer receive whale transaction alerts.\n\n🚀 To restart: /start\n📊 View stats: /stats\n🙋 Need help: /help`;
+    const message = `**Alerts Stopped**\n\nYou will no longer receive whale transaction alerts.\n\nTo restart: /start\nView stats: /stats\nNeed help: /help`;
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
   
@@ -484,28 +484,28 @@ How much should a transaction be worth to alert you?
   }
   
   private async handleHelp(ctx: Context) {
-    const helpText = `🐋 **Solana Whale Tracker**
+    const helpText = `**Solana Whale Tracker**
 
 **Basic Commands:**
-🚀 /start - Set up or restart the bot
-🛑 /stop - Stop all alerts
-🙋 /help - Show this help
+/start - Set up or restart the bot
+/stop - Stop all alerts
+/help - Show this help
 
 **Advanced Settings:**
-📊 /stats - View whale statistics
-🎯 /threshold - View current threshold
-💵 /setusd <amount> - Set USD threshold
-🔶 /setsol <amount> - Set SOL threshold
-⏱️ /setrefresh <seconds> - Set update speed
-🔔 /alerts - Toggle alerts on/off
-🔄 /reset - Reset all settings
+/stats - View whale statistics
+/threshold - View current threshold
+/setusd <amount> - Set USD threshold
+/setsol <amount> - Set SOL threshold
+/setrefresh <seconds> - Set update speed
+/alerts - Toggle alerts on/off
+/reset - Reset all settings
 
 **Quick Setup:**
-🔥 /quick5 - $5,000+ alerts
-💪 /quick25 - $25,000+ alerts
-🐋 /quick100 - $100,000+ alerts
+/quick5 - $5,000+ alerts
+/quick25 - $25,000+ alerts
+/quick100 - $100,000+ alerts
 
-💡 **Tip:** Just use /start to get started!`;
+**Tip:** Just use /start to get started!`;
     
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
   }
