@@ -13,19 +13,31 @@ export function shortenAddress(address: string, length: number = 6): string {
 
 export function formatWhaleAlert(whale: WhaleTransaction): string {
   const amount = formatSolAmount(BigInt(whale.amountLamports));
-  const from = shortenAddress(whale.fromAddress);
-  const to = shortenAddress(whale.toAddress);
+  const isReceiving = whale.fromAddress === 'Unknown';
+  const mainAddress = isReceiving ? whale.toAddress : whale.fromAddress;
+  const direction = isReceiving ? 'RECEIVED' : 'SENT';
   
-  return `${EMOJI.WHALE} *Whale Alert!*
-
-${EMOJI.MONEY} *Amount:* ${amount} SOL
-${EMOJI.ARROW} *From:* \`${from}\`
-${EMOJI.ARROW} *To:* \`${to}\`
-${EMOJI.INFO} *Block:* ${whale.blockHeight.toLocaleString()}
-${EMOJI.INFO} *Time:* ${new Date(whale.timestamp).toLocaleString()}
-${EMOJI.INFO} *Signature:* \`${shortenAddress(whale.signature, 8)}\`
-
-[View on Solscan](https://solscan.io/tx/${whale.signature})`;
+  // Check if signature looks like a real transaction hash
+  const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_');
+  
+  let message = `🐋 **WHALE DETECTED: ${amount} SOL**\n\n`;
+  
+  message += `💸 **${direction}**\n`;
+  message += `Account: \`${shortenAddress(mainAddress)}\`\n`;
+  message += `Amount: **${amount} SOL**\n`;
+  
+  if (hasRealSignature) {
+    message += `\n🔗 **Transaction**\n`;
+    message += `[View on Solscan](https://solscan.io/tx/${whale.signature})`;
+  } else {
+    message += `\n📍 **Account Details**\n`;
+    message += `[View on Solscan](https://solscan.io/account/${mainAddress})`;
+  }
+  
+  const timeAgo = formatTimeAgo(whale.timestamp);
+  message += `\n\n⏰ ${timeAgo}`;
+  
+  return message;
 }
 
 export function formatStats(stats: WhaleStats): string {
@@ -45,6 +57,22 @@ ${EMOJI.MONEY} *Volume:* ${stats.last24hVolume.toLocaleString()} SOL
 ${stats.largestWhale ? `*Largest Whale Today:*
 ${EMOJI.MONEY} ${formatSolAmount(stats.largestWhale.amountLamports)} SOL
 ${EMOJI.INFO} \`${shortenAddress(stats.largestWhale.signature, 8)}\`` : ''}`;
+}
+
+export function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diffMs = now - timestamp;
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  
+  if (diffHours > 0) {
+    return `${diffHours}h ${diffMinutes % 60}m ago`;
+  } else if (diffMinutes > 0) {
+    return `${diffMinutes}m ago`;
+  } else {
+    return `${diffSeconds}s ago`;
+  }
 }
 
 export function escapeMarkdown(text: string): string {

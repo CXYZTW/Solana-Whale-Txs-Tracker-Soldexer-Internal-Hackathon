@@ -308,15 +308,19 @@ export class SQDApiClient extends EventEmitter {
               await this.logWhaleTransaction(balance, changeSol, blockNumber, blockTimestamp, transactionMap, solPrice);
             }
             
+            // Always emit balance change for whale detection
+            const transactionForBalance = transactionMap.get(balance.transactionIndex);
+            const realSignature = transactionForBalance?.signatures?.[0];
+            
             this.emit('balanceChange', {
               account: balance.account,
               change: balanceChange,
               preBalance: preBalance,
               postBalance: postBalance,
-              signature: `block_${blockNumber}_tx_${balance.transactionIndex || 0}`,
+              signature: realSignature || `balance_change_${blockNumber}_${balance.account.slice(-8)}`,
               blockHeight: blockNumber,
               timestamp: blockTimestamp,
-              transaction: balance
+              transaction: transactionForBalance || balance
             });
           }
         }
@@ -330,27 +334,8 @@ export class SQDApiClient extends EventEmitter {
       const balanceChange = postBalance - preBalance;
       
       if (balanceChange !== 0n) {
-        const changeSol = Number(balanceChange) / 1_000_000_000;
-        
-        // Check against default threshold for console logging
-        const solPrice = priceService.getSolPrice();
-        const defaultThreshold = config.whaleThreshold;
-        const defaultType = config.whaleThresholdType;
-        let isWhale = false;
-        
-        if (defaultType === 'SOL') {
-          isWhale = Math.abs(changeSol) >= defaultThreshold;
-        } else {
-          // USD threshold
-          const amountUsd = Math.abs(changeSol) * solPrice;
-          isWhale = amountUsd >= defaultThreshold;
-        }
-        
-        // Log if it's a whale based on default threshold
-        if (isWhale) {
-          resourceMonitor.recordWhaleTransaction();
-          await this.logWhaleTransaction(data, changeSol, this.currentBlockHeight || 0, Date.now(), new Map(), solPrice);
-        }
+        // Skip individual processing - already handled in main block processing
+        // This fallback is only for individual balance items without block context
         
         this.emit('balanceChange', {
           account: data.account,

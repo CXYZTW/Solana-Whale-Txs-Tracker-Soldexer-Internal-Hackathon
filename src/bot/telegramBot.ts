@@ -377,18 +377,24 @@ Or customize manually:
     const solPrice = priceService.getSolPrice();
     const activeUsers = userSettingsService.getAllActiveUsers();
     
+    console.log(`🚨 Broadcasting whale alert: ${whale.amountSol.toFixed(2)} SOL to ${activeUsers.length} users`);
+    
     // Check each user's threshold settings
     for (const userId of activeUsers) {
       if (userSettingsService.isWhaleTransaction(userId, whale.amountSol, solPrice)) {
         const alert = formatWhaleAlert(whale);
         
         try {
+          console.log(`📤 Sending alert to user ${userId}`);
           await this.bot.telegram.sendMessage(userId, alert, { 
             parse_mode: 'Markdown'
           });
+          console.log(`✅ Alert sent to user ${userId}`);
         } catch (error) {
-          console.error(`Failed to send alert to user ${userId}:`, error);
+          console.error(`❌ Failed to send alert to user ${userId}:`, error);
         }
+      } else {
+        console.log(`⏭️ User ${userId} threshold not met for ${whale.amountSol.toFixed(2)} SOL`);
       }
     }
   }
