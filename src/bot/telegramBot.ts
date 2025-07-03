@@ -14,6 +14,7 @@ export class TelegramBot {
   private subscribedChats: Set<number> = new Set();
   private adminIds: Set<number> = new Set();
   private sentAlerts: Set<string> = new Set();
+  private onboardingState: Map<number, { step: string; data: any }> = new Map();
 
   constructor(token: string, whaleDetector: WhaleDetector) {
     this.bot = new Telegraf(token);
@@ -25,9 +26,14 @@ export class TelegramBot {
 
   private setupCommands() {
     this.bot.command('start', (ctx) => this.handleStart(ctx));
+    this.bot.command('stop', (ctx) => this.handleStop(ctx));
+    this.bot.command('help', (ctx) => this.handleHelp(ctx));
+    
+    // Hidden advanced commands
     this.bot.command('quick5', (ctx) => this.handleQuickSetup(ctx, 5000, 'USD'));
     this.bot.command('quick25', (ctx) => this.handleQuickSetup(ctx, 25000, 'USD'));
     this.bot.command('quick100', (ctx) => this.handleQuickSetup(ctx, 100000, 'USD'));
+    // Advanced settings (hidden from main help)
     this.bot.command('stats', (ctx) => this.handleStats(ctx));
     this.bot.command('threshold', (ctx) => this.handleThreshold(ctx));
     this.bot.command('setthreshold', (ctx) => this.handleSetThreshold(ctx));
@@ -36,14 +42,12 @@ export class TelegramBot {
     this.bot.command('refresh', (ctx) => this.handleRefreshInterval(ctx));
     this.bot.command('setrefresh', (ctx) => this.handleSetRefreshInterval(ctx));
     this.bot.command('alerts', (ctx) => this.handleAlerts(ctx));
-    this.bot.command('stop', (ctx) => this.handleStop(ctx));
     this.bot.command('reset', (ctx) => this.handleReset(ctx));
     this.bot.command('usage', (ctx) => this.handleUsage(ctx));
-    this.bot.command('help', (ctx) => this.handleHelp(ctx));
     
     this.bot.on('text', (ctx) => {
       if (ctx.message.text && !ctx.message.text.startsWith('/')) {
-        ctx.reply('Unknown command. Use /help to see available commands.');
+        this.handleOnboardingInput(ctx);
       }
     });
   }
@@ -73,33 +77,36 @@ export class TelegramBot {
       return;
     }
     
-    // Check if user is new (using default settings)
+    // Check if user has completed onboarding
     const settings = userSettingsService.getUserSettings(userId);
-    const isNewUser = settings.threshold === config.whaleThreshold && settings.thresholdType === config.whaleThresholdType;
+    const hasCustomSettings = settings.threshold !== config.whaleThreshold || 
+                              settings.thresholdType !== config.whaleThresholdType ||
+                              settings.pollingIntervalSeconds !== config.defaultPollingIntervalSeconds;
     
-    if (isNewUser) {
-      await this.handleNewUserOnboarding(ctx, userId);
-    } else {
+    if (hasCustomSettings) {
       await this.handleReturningUser(ctx, userId);
+    } else {
+      await this.startOnboarding(ctx, userId);
     }
   }
   
-  private async handleNewUserOnboarding(ctx: Context, _userId: number) {
+  private async startOnboarding(ctx: Context, userId: number) {
+    this.onboardingState.set(userId, { step: 'welcome', data: {} });
+    
     const welcomeMessage = `🐋 **Welcome to Solana Whale Tracker!**
 
 💰 I'll alert you when large SOL transactions happen on the blockchain.
 
-**Quick Setup** (choose one):
+Let's set you up in 3 quick steps:
 
-🔥 /quick5 - Get alerts for $5,000+ transactions (active)
-💪 /quick25 - Get alerts for $25,000+ transactions (balanced)
-🐋 /quick100 - Get alerts for $100,000+ transactions (whales only)
+🎯 **Step 1: Choose your alert threshold**
 
-Or customize manually:
-• /setusd <amount> - Set your own USD threshold
-• /setsol <amount> - Set your own SOL threshold
+How much should a transaction be worth to alert you?
 
-🚀 **Choose a quick option above to start immediately!**`;
+🔥 Reply **1** for $5,000+ (very active)
+💪 Reply **2** for $25,000+ (balanced)
+🐋 Reply **3** for $100,000+ (whales only)
+🎯 Reply **custom** to set your own amount`;
     
     await ctx.reply(welcomeMessage, { parse_mode: 'Markdown' });
   }
@@ -283,6 +290,138 @@ Or customize manually:
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
   
+  private async handleOnboardingInput(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    
+    const state = this.onboardingState.get(userId);
+    if (!state) {
+      await ctx.reply('🤔 I didn\'t understand that. Type /start to begin or /help for commands.');
+      return;
+    }
+    
+    const input = ctx.message && 'text' in ctx.message ? ctx.message.text.toLowerCase().trim() : '';
+    
+    switch (state.step) {
+      case 'welcome':
+        await this.handleThresholdChoice(ctx, userId, input, state);
+        break;
+      case 'custom_amount':
+        await this.handleCustomAmount(ctx, userId, input, state);
+        break;
+      case 'currency_choice':
+        await this.handleCurrencyChoice(ctx, userId, input, state);
+        break;
+      case 'refresh_choice':
+        await this.handleRefreshChoice(ctx, userId, input, state);
+        break;
+    }
+  }
+  
+  private async handleThresholdChoice(ctx: Context, userId: number, input: string, state: any) {
+    let threshold: number;
+    let currency: 'USD' | 'SOL';
+    
+    switch (input) {
+      case '1':
+        threshold = 5000;
+        currency = 'USD';
+        break;
+      case '2':
+        threshold = 25000;
+        currency = 'USD';
+        break;
+      case '3':
+        threshold = 100000;
+        currency = 'USD';
+        break;
+      case 'custom':
+        state.step = 'custom_amount';
+        this.onboardingState.set(userId, state);
+        await ctx.reply('🎯 **Custom Threshold**\n\nEnter your desired threshold amount (just the number):\n\n💵 Example: **25000** for $25,000\n🔶 Example: **100** for 100 SOL', { parse_mode: 'Markdown' });
+        return;
+      default:
+        await ctx.reply('😅 Please reply with **1**, **2**, **3**, or **custom**');
+        return;
+    }
+    
+    state.data = { threshold, currency };
+    state.step = 'refresh_choice';
+    this.onboardingState.set(userId, state);
+    
+    const message = `✅ Great! You\'ll get alerts for ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}+ transactions.\n\n⏱️ **Step 2: How often should I check for new transactions?**\n\n⚡ Reply **fast** for every 5 seconds\n🐌 Reply **normal** for every 15 seconds\n🐢 Reply **slow** for every 30 seconds`;
+    
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleCustomAmount(ctx: Context, userId: number, input: string, state: any) {
+    const amount = parseFloat(input);
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply('❌ Please enter a valid positive number.');
+      return;
+    }
+    
+    state.data = { threshold: amount };
+    state.step = 'currency_choice';
+    this.onboardingState.set(userId, state);
+    
+    await ctx.reply(`💰 **${amount.toLocaleString()}** - got it!\n\n🌍 **What currency?**\n\n💵 Reply **usd** for US Dollars\n🔶 Reply **sol** for Solana`, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleCurrencyChoice(ctx: Context, userId: number, input: string, state: any) {
+    let currency: 'USD' | 'SOL';
+    
+    if (input === 'usd' || input === 'dollar' || input === 'dollars') {
+      currency = 'USD';
+    } else if (input === 'sol' || input === 'solana') {
+      currency = 'SOL';
+    } else {
+      await ctx.reply('😅 Please reply with **usd** or **sol**');
+      return;
+    }
+    
+    state.data.currency = currency;
+    state.step = 'refresh_choice';
+    this.onboardingState.set(userId, state);
+    
+    const message = `✅ Perfect! Alerts for ${currency === 'USD' ? '$' + state.data.threshold.toLocaleString() : state.data.threshold + ' SOL'}+ transactions.\n\n⏱️ **Step 3: How often should I check for new transactions?**\n\n⚡ Reply **fast** for every 5 seconds\n🐌 Reply **normal** for every 15 seconds\n🐢 Reply **slow** for every 30 seconds`;
+    
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleRefreshChoice(ctx: Context, userId: number, input: string, state: any) {
+    let refreshSeconds: number;
+    
+    switch (input) {
+      case 'fast':
+        refreshSeconds = 5;
+        break;
+      case 'normal':
+        refreshSeconds = 15;
+        break;
+      case 'slow':
+        refreshSeconds = 30;
+        break;
+      default:
+        await ctx.reply('😅 Please reply with **fast**, **normal**, or **slow**');
+        return;
+    }
+    
+    // Complete setup
+    const { threshold, currency } = state.data;
+    userSettingsService.setThreshold(userId, threshold, currency);
+    userSettingsService.setPollingInterval(userId, refreshSeconds);
+    userSettingsService.toggleAlerts(userId, true);
+    
+    // Clear onboarding state
+    this.onboardingState.delete(userId);
+    
+    const speedText = input === 'fast' ? 'super fast' : input === 'normal' ? 'balanced' : 'relaxed';
+    const finalMessage = `🎉 **You\'re all set!**\n\n🎯 **Threshold:** ${currency === 'USD' ? '$' + threshold.toLocaleString() : threshold + ' SOL'}\n⏱️ **Speed:** ${speedText} (${refreshSeconds}s)\n🔔 **Alerts:** ON\n\n🚀 **You\'ll now receive whale alerts!**\n\n📊 Use /stats to see activity\n🛑 Use /stop to pause alerts\n🙋 Use /help for more options`;
+    
+    await ctx.reply(finalMessage, { parse_mode: 'Markdown' });
+  }
+  
   private async handleStop(ctx: Context) {
     const userId = ctx.from?.id;
     if (!userId) {
@@ -290,9 +429,13 @@ Or customize manually:
       return;
     }
     
+    // Clear any onboarding state
+    this.onboardingState.delete(userId);
+    
+    // Disable alerts
     userSettingsService.toggleAlerts(userId, false);
     
-    const message = `🛑 **Alerts Stopped**\n\nYou will no longer receive whale transaction alerts.\n\n💡 To resume: /alerts\n📊 View stats: /stats\n🔧 Change settings: /help`;
+    const message = `🛑 **Alerts Stopped**\n\nYou will no longer receive whale transaction alerts.\n\n🚀 To restart: /start\n📊 View stats: /stats\n🙋 Need help: /help`;
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
   
@@ -341,32 +484,28 @@ Or customize manually:
   }
   
   private async handleHelp(ctx: Context) {
-    const helpText = `
-🐋 **Solana Whale Tracker Bot**
+    const helpText = `🐋 **Solana Whale Tracker**
 
-**Available Commands:**
+**Basic Commands:**
+🚀 /start - Set up or restart the bot
+🛑 /stop - Stop all alerts
+🙋 /help - Show this help
 
-🎯 **Threshold Settings**
-• /threshold - View your current whale threshold
-• /setsol <amount> - Set threshold in SOL (e.g., /setsol 100)
-• /setusd <amount> - Set threshold in USD (e.g., /setusd 15000)
+**Advanced Settings:**
+📊 /stats - View whale statistics
+🎯 /threshold - View current threshold
+💵 /setusd <amount> - Set USD threshold
+🔶 /setsol <amount> - Set SOL threshold
+⏱️ /setrefresh <seconds> - Set update speed
+🔔 /alerts - Toggle alerts on/off
+🔄 /reset - Reset all settings
 
-⏱️ **Data Freshness**
-• /refresh - View how often you get updates
-• /setrefresh <seconds> - Set update speed (1-300s)
+**Quick Setup:**
+🔥 /quick5 - $5,000+ alerts
+💪 /quick25 - $25,000+ alerts
+🐋 /quick100 - $100,000+ alerts
 
-📊 **Information & Control**
-• /stats - View whale statistics
-• /alerts - Toggle alerts on/off
-• /stop - Stop all alerts
-• /reset - Reset to default settings
-• /help - Show this help message
-
-**Examples:**
-🔹 /setsol 50 - Get alerts for transactions ≥ 50 SOL
-🔹 /setusd 10000 - Get alerts for transactions ≥ $10,000
-🔹 /setrefresh 5 - Get updates every 5 seconds (super fast)
-`;
+💡 **Tip:** Just use /start to get started!`;
     
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
   }
