@@ -29,10 +29,10 @@ export class TelegramBot {
     this.bot.command('stop', (ctx) => this.handleStop(ctx));
     this.bot.command('help', (ctx) => this.handleHelp(ctx));
     
-    // Hidden advanced commands
-    this.bot.command('quick5', (ctx) => this.handleQuickSetup(ctx, 5000, 'USD'));
-    this.bot.command('quick25', (ctx) => this.handleQuickSetup(ctx, 25000, 'USD'));
+    // Hidden advanced commands (updated to new defaults)
     this.bot.command('quick100', (ctx) => this.handleQuickSetup(ctx, 100000, 'USD'));
+    this.bot.command('quick500', (ctx) => this.handleQuickSetup(ctx, 500000, 'USD'));
+    this.bot.command('quick1m', (ctx) => this.handleQuickSetup(ctx, 1000000, 'USD'));
     // Advanced settings (hidden from main help)
     this.bot.command('stats', (ctx) => this.handleStats(ctx));
     this.bot.command('threshold', (ctx) => this.handleThreshold(ctx));
@@ -103,9 +103,9 @@ Let's set you up in 3 quick steps:
 
 How much should a transaction be worth to alert you?
 
-Reply **1** for $5,000+ (very active)
-Reply **2** for $25,000+ (balanced)
-Reply **3** for $100,000+ (whales only)
+Reply **1** for $100,000+ (balanced)
+Reply **2** for $500,000+ (big whales)
+Reply **3** for $1,000,000+ (mega whales)
 Reply **custom** to set your own amount`;
     
     await ctx.reply(welcomeMessage, { parse_mode: 'Markdown' });
@@ -324,21 +324,21 @@ Reply **custom** to set your own amount`;
     
     switch (input) {
       case '1':
-        threshold = 5000;
+        threshold = 100000;
         currency = 'USD';
         break;
       case '2':
-        threshold = 25000;
+        threshold = 500000;
         currency = 'USD';
         break;
       case '3':
-        threshold = 100000;
+        threshold = 1000000;
         currency = 'USD';
         break;
       case 'custom':
         state.step = 'custom_amount';
         this.onboardingState.set(userId, state);
-        await ctx.reply('**Custom Threshold**\n\nEnter your desired threshold amount (just the number):\n\nExample: **25000** for $25,000\nExample: **100** for 100 SOL', { parse_mode: 'Markdown' });
+        await ctx.reply('**Custom Threshold**\n\nEnter your desired amount in USD or SOL:\n\n**For USD:** Type the dollar amount\nExample: **50000** (for $50,000)\nExample: **250000** (for $250,000)\n\n**For SOL:** Type the amount with "SOL"\nExample: **100 SOL**\nExample: **500 SOL**', { parse_mode: 'Markdown' });
         return;
       default:
         await ctx.reply('Please reply with **1**, **2**, **3**, or **custom**');
@@ -355,17 +355,40 @@ Reply **custom** to set your own amount`;
   }
   
   private async handleCustomAmount(ctx: Context, userId: number, input: string, state: any) {
-    const amount = parseFloat(input);
-    if (isNaN(amount) || amount <= 0) {
-      await ctx.reply('Please enter a valid positive number.');
-      return;
+    const inputLower = input.toLowerCase().trim();
+    let amount: number;
+    let currency: 'USD' | 'SOL';
+    
+    // Check if input contains "sol"
+    if (inputLower.includes('sol')) {
+      const numberPart = inputLower.replace(/[^0-9.]/g, '');
+      amount = parseFloat(numberPart);
+      currency = 'SOL';
+      
+      if (isNaN(amount) || amount <= 0) {
+        await ctx.reply('Please enter a valid SOL amount like: **100 SOL** or **500 SOL**', { parse_mode: 'Markdown' });
+        return;
+      }
+    } else {
+      // Assume USD if no "sol" specified
+      amount = parseFloat(inputLower);
+      currency = 'USD';
+      
+      if (isNaN(amount) || amount <= 0) {
+        await ctx.reply('Please enter a valid amount like: **50000** (for $50,000) or **100 SOL**', { parse_mode: 'Markdown' });
+        return;
+      }
     }
     
-    state.data = { threshold: amount };
-    state.step = 'currency_choice';
+    // Skip currency choice since we already determined it
+    state.data = { threshold: amount, currency };
+    state.step = 'refresh_choice';
     this.onboardingState.set(userId, state);
     
-    await ctx.reply(`**${amount.toLocaleString()}** - got it!\n\n**What currency?**\n\nReply **usd** for US Dollars\nReply **sol** for Solana`, { parse_mode: 'Markdown' });
+    const displayAmount = currency === 'USD' ? `$${amount.toLocaleString()}` : `${amount} SOL`;
+    const message = `Perfect! You'll get alerts for ${displayAmount}+ transactions.\n\n**Step 2: How often should I check for new transactions?**\n\nReply **fast** for every 5 seconds\nReply **normal** for every 15 seconds\nReply **slow** for every 30 seconds`;
+    
+    await ctx.reply(message, { parse_mode: 'Markdown' });
   }
   
   private async handleCurrencyChoice(ctx: Context, userId: number, input: string, state: any) {
@@ -501,9 +524,9 @@ Reply **custom** to set your own amount`;
 /reset - Reset all settings
 
 **Quick Setup:**
-/quick5 - $5,000+ alerts
-/quick25 - $25,000+ alerts
 /quick100 - $100,000+ alerts
+/quick500 - $500,000+ alerts
+/quick1m - $1,000,000+ alerts
 
 **Tip:** Just use /start to get started!`;
     
