@@ -63,6 +63,8 @@ ALERT_COOLDOWN_MINUTES=5
 - `/threshold` - View your current whale threshold
 - `/setsol <amount>` - Set threshold in SOL (e.g., `/setsol 100`)
 - `/setusd <amount>` - Set threshold in USD (e.g., `/setusd 15000`)
+- `/refresh` - View how often you get updates
+- `/setrefresh <seconds>` - Set update speed (5-300s)
 - `/alerts` - Toggle your alerts on/off
 - `/stats` - View whale statistics
 - `/help` - Show help message
@@ -71,6 +73,8 @@ ALERT_COOLDOWN_MINUTES=5
 
 - `/setsol 50` - Get alerts for transactions ≥ 50 SOL
 - `/setusd 10000` - Get alerts for transactions ≥ $10,000 USD
+- `/setrefresh 5` - Get updates every 5 seconds (super fast)
+- `/setrefresh 60` - Get updates every minute (relaxed)
 
 ## Architecture
 
@@ -87,6 +91,7 @@ ALERT_COOLDOWN_MINUTES=5
 | SOLDEXER_API_URL       | Soldexer/Portal API endpoint        | https://portal.sqd.dev/datasets/solana-mainnet |
 | WHALE_THRESHOLD        | Default threshold for new users     | 50000                                          |
 | WHALE_THRESHOLD_TYPE   | Default threshold type (SOL or USD) | USD                                            |
+| DEFAULT_POLLING_INTERVAL_SECONDS | Default refresh interval | 15 |
 | ENABLE_ALERTS          | Global alert toggle                 | true                                           |
 | ALERT_COOLDOWN_MINUTES | Cooldown between similar alerts     | 5                                              |
 
