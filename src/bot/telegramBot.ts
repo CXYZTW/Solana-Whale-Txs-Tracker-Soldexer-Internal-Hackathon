@@ -103,9 +103,9 @@ Let's set you up in 3 quick steps:
 
 How much should a transaction be worth to alert you?
 
-Reply **1** for $100,000+ (balanced)
-Reply **2** for $500,000+ (big whales)
-Reply **3** for $1,000,000+ (mega whales)
+Reply **1** for $100,000+ (baby whale)
+Reply **2** for $500,000+ (whale)
+Reply **3** for $1,000,000+ (giga whale)
 Reply **custom** to set your own amount`;
     
     await ctx.reply(welcomeMessage, { parse_mode: 'Markdown' });

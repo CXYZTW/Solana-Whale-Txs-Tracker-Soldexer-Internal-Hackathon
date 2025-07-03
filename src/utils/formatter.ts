@@ -28,7 +28,9 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   // Calculate USD value using actual SOL price
   const usdValue = priceService.formatUsdValue(parseFloat(amount.replace(/,/g, '')));
   
-  let message = `🐋 **WHALE: ${Math.round(parseFloat(amount.replace(/,/g, '')))} SOL**\n\n`;
+  const roundedAmount = Math.round(parseFloat(amount.replace(/,/g, '')));
+  const formattedAmount = roundedAmount.toLocaleString();
+  let message = `🐋 **WHALE: ${formattedAmount} SOL**\n\n`;
   
   message += `💰 **Amount:** ${amount} SOL\n`;
   message += `💵 **Value:** ${usdValue}\n`;
