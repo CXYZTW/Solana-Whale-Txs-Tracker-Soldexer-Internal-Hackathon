@@ -101,7 +101,16 @@ export class WhaleDetector extends EventEmitter {
   }
 
   private shouldAlert(whale: WhaleTransaction): boolean {
+    // Use signature as primary key to prevent exact duplicates
+    const signatureKey = whale.signature;
     const cooldownKey = `${whale.fromAddress}-${whale.toAddress}`;
+    
+    // Check for exact duplicate by signature
+    if (this.cooldownMap.has(signatureKey)) {
+      console.log(`⏭️ Duplicate signature blocked: ${signatureKey}`);
+      return false;
+    }
+    
     const lastAlert = this.cooldownMap.get(cooldownKey);
     const now = Date.now();
     const cooldownMs = config.alertCooldownMinutes * 60 * 1000;
@@ -112,6 +121,8 @@ export class WhaleDetector extends EventEmitter {
       return false;
     }
     
+    // Store both signature and address pair
+    this.cooldownMap.set(signatureKey, now);
     this.cooldownMap.set(cooldownKey, now);
     return true;
   }

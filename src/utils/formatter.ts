@@ -16,7 +16,6 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   const amount = formatSolAmount(BigInt(whale.amountLamports));
   const isReceiving = whale.fromAddress === 'Unknown';
   const mainAddress = isReceiving ? whale.toAddress : whale.fromAddress;
-  const direction = isReceiving ? 'RECEIVED' : 'SENT';
   
   // Check if signature looks like a real transaction hash
   const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_') && !whale.signature.includes('balance_change_');
@@ -30,12 +29,16 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   
   message += `💰 **Amount:** ${amount} SOL\n`;
   message += `💵 **Value:** ${usdValue}\n`;
-  message += `📍 **${direction === 'RECEIVED' ? 'Receiver' : 'Account'}:** \`${shortenAddress(mainAddress)}\`\n`;
   
+  // Always show the account that had the balance change
+  message += `📍 **Account:** \`${shortenAddress(mainAddress)}\`\n`;
+  
+  // Always try to show transaction link if we have a real signature
   if (hasRealSignature) {
     message += `\n🔗 [View Transaction](https://solscan.io/tx/${whale.signature})`;
   } else {
-    message += `\n🔗 [View Account](https://solscan.io/account/${mainAddress})`;
+    // If no real signature, show account link but label it as transaction for consistency
+    message += `\n🔗 [View Transaction](https://solscan.io/account/${mainAddress})`;
   }
   
   message += `\n⏰ ${timeAgo}`;
