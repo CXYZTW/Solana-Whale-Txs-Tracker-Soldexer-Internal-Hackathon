@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { WhaleTransaction, WhaleStats } from '../types';
 import { LAMPORTS_PER_SOL } from '../utils/constants';
 import { config } from '../utils/config';
+import { priceService } from './priceService';
 
 interface BalanceChangeEvent {
   account: string;
@@ -41,12 +42,29 @@ export class WhaleDetector extends EventEmitter {
     const changeLamports = Math.abs(Number(event.change));
     const changeSol = changeLamports / LAMPORTS_PER_SOL;
 
-    if (changeSol >= this.whaleThreshold) {
+    // Use same threshold logic as console logging
+    const solPrice = priceService.getSolPrice();
+    let isWhale = false;
+    
+    if (config.whaleThresholdType === 'SOL') {
+      isWhale = changeSol >= config.whaleThreshold;
+      console.log(`🔍 WhaleDetector: Processing ${changeSol.toFixed(2)} SOL (threshold: ${config.whaleThreshold} SOL)`);
+    } else {
+      const amountUsd = changeSol * solPrice;
+      isWhale = amountUsd >= config.whaleThreshold;
+      console.log(`🔍 WhaleDetector: Processing ${changeSol.toFixed(2)} SOL = $${Math.round(amountUsd)} (threshold: $${config.whaleThreshold})`);
+    }
+    
+    if (isWhale) {
       const whale = this.createWhaleTransaction(event, changeLamports);
       
+      console.log(`🐋 WhaleDetector: Whale detected, checking cooldown...`);
       if (this.shouldAlert(whale)) {
+        console.log(`✅ WhaleDetector: Sending whale alert to Telegram`);
         this.updateStats(whale);
         this.emit('whale', whale);
+      } else {
+        console.log(`❌ WhaleDetector: Alert blocked by cooldown`);
       }
     }
   }
@@ -86,8 +104,11 @@ export class WhaleDetector extends EventEmitter {
     const cooldownKey = `${whale.fromAddress}-${whale.toAddress}`;
     const lastAlert = this.cooldownMap.get(cooldownKey);
     const now = Date.now();
+    const cooldownMs = config.alertCooldownMinutes * 60 * 1000;
     
-    if (lastAlert && now - lastAlert < config.alertCooldownMinutes * 60 * 1000) {
+    if (lastAlert && now - lastAlert < cooldownMs) {
+      const remainingMs = cooldownMs - (now - lastAlert);
+      console.log(`⏳ Cooldown active for ${cooldownKey}, ${Math.round(remainingMs/1000)}s remaining`);
       return false;
     }
     
