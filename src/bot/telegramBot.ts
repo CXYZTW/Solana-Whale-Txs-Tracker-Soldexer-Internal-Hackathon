@@ -5,6 +5,7 @@ import { formatWhaleAlert, formatStats } from '../utils/formatter';
 import { config } from '../utils/config';
 import { userSettingsService } from '../services/userSettings';
 import { priceService } from '../services/priceService';
+import { resourceMonitor } from '../services/resourceMonitor';
 
 export class TelegramBot {
   private bot: Telegraf;
@@ -34,6 +35,7 @@ export class TelegramBot {
     this.bot.command('refresh', (ctx) => this.handleRefreshInterval(ctx));
     this.bot.command('setrefresh', (ctx) => this.handleSetRefreshInterval(ctx));
     this.bot.command('alerts', (ctx) => this.handleAlerts(ctx));
+    this.bot.command('usage', (ctx) => this.handleUsage(ctx));
     this.bot.command('help', (ctx) => this.handleHelp(ctx));
     
     this.bot.on('text', (ctx) => {
@@ -278,6 +280,36 @@ Or customize manually:
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
 
+  private async handleUsage(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId || !this.isAdmin(userId)) {
+      await ctx.reply('❌ This command is only available to administrators.');
+      return;
+    }
+    
+    const metrics = resourceMonitor.getMetrics();
+    const priceMetrics = priceService.getResourceMetrics();
+    
+    const usageText = `📊 **Resource Usage Report**
+
+🔧 **System Performance**
+• API Calls: ${metrics.apiCallsPerMinute}/min
+• Memory Usage: ${metrics.memoryUsageMB}MB
+• Active Users: ${metrics.activeUsers}
+• Whale Transactions: ${metrics.whaleTransactions}
+• Uptime: ${Math.floor(metrics.uptime / 60)} minutes
+
+💰 **Price Service**
+• Total Fetches: ${priceMetrics.fetchCount}
+• Cache Age: ${priceMetrics.cacheAge ? Math.floor(priceMetrics.cacheAge / 1000) : 'N/A'}s
+
+⚠️ **Status**
+• High Resource Usage: ${resourceMonitor.isResourceUsageHigh() ? 'YES' : 'NO'}
+• Throttling Active: ${resourceMonitor.shouldThrottle() ? 'YES' : 'NO'}`;
+    
+    await ctx.reply(usageText, { parse_mode: 'Markdown' });
+  }
+  
   private async handleHelp(ctx: Context) {
     const helpText = `
 🐋 **Solana Whale Tracker Bot**

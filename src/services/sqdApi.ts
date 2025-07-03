@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { config } from '../utils/config';
 import { priceService } from './priceService';
 import { userSettingsService } from './userSettings';
+import { resourceMonitor } from './resourceMonitor';
 
 export class SQDApiClient extends EventEmitter {
   private baseUrl: string;
@@ -12,6 +13,9 @@ export class SQDApiClient extends EventEmitter {
   private abortController?: AbortController;
   private currentBlockHeight?: number;
   private loggedTransactions: Set<string> = new Set();
+  private lastActiveUserCheck: number = 0;
+  private activeUserCheckInterval: number = 30000; // 30 seconds
+  private hasActiveUsers: boolean = false;
 
   constructor(baseUrl: string = config.sqdApiUrl) {
     super();
@@ -77,7 +81,31 @@ export class SQDApiClient extends EventEmitter {
 
     while (this.isStreaming) {
       try {
+        // Check for active users periodically to avoid unnecessary API calls
+        const now = Date.now();
+        if (now - this.lastActiveUserCheck > this.activeUserCheckInterval) {
+          const activeUsers = userSettingsService.getAllActiveUsers();
+          this.hasActiveUsers = activeUsers.length > 0;
+          resourceMonitor.updateActiveUsers(activeUsers.length);
+          this.lastActiveUserCheck = now;
+        }
+        
+        // Throttle if resource usage is too high
+        if (resourceMonitor.shouldThrottle()) {
+          console.log('⚠️  Throttling due to high resource usage');
+          await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
+          continue;
+        }
+        
+        // Skip API calls if no active users
+        if (!this.hasActiveUsers) {
+          console.log('No active users, sleeping...');
+          await new Promise(resolve => setTimeout(resolve, 60000)); // Sleep 1 minute
+          continue;
+        }
+        
         // Get latest block
+        resourceMonitor.recordApiCall();
         const latestBlock = await this.getLatestBlock();
         
         if (!currentBlock) {
@@ -87,6 +115,7 @@ export class SQDApiClient extends EventEmitter {
         // Only fetch if there are new blocks
         if (latestBlock.number > currentBlock!) {
           // Fetching new blocks (stats available via /stats command)
+          resourceMonitor.recordApiCall();
           await this.fetchBlockRange(currentBlock!, latestBlock.number);
           currentBlock = latestBlock.number;
           this.reconnectAttempts = 0; // Reset on success
@@ -120,12 +149,20 @@ export class SQDApiClient extends EventEmitter {
 
   private async fetchBlockRange(fromBlock: number, toBlock: number) {
     this.abortController = new AbortController();
-    this.loggedTransactions.clear();
+    
+    // Limit block range to reduce API load and memory usage
+    const maxBlockRange = 100; // Process max 100 blocks at a time
+    const actualToBlock = Math.min(toBlock, fromBlock + maxBlockRange);
+    
+    // Clear old transactions periodically to prevent memory leak
+    if (this.loggedTransactions.size > 10000) {
+      this.loggedTransactions.clear();
+    }
     
     const requestBody = {
       type: 'solana',
       fromBlock: fromBlock,
-      toBlock: toBlock,
+      toBlock: actualToBlock,
       fields: {
         block: {
           number: true,
@@ -179,28 +216,39 @@ export class SQDApiClient extends EventEmitter {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const data = JSON.parse(line);
-              if (data.header && data.balances) {
-                blockCount++;
-                balanceCount += data.balances.length;
-                // Count whales in this block
-                for (const balance of data.balances) {
-                  if (balance.account && balance.pre !== undefined && balance.post !== undefined) {
-                    const changeSol = Math.abs(Number(BigInt(balance.post) - BigInt(balance.pre))) / 1_000_000_000;
-                    if (changeSol >= 100) {
-                      whaleCount++;
+        // Process in batches to reduce memory pressure
+        const batchSize = 50;
+        for (let i = 0; i < lines.length; i += batchSize) {
+          const batch = lines.slice(i, i + batchSize);
+          
+          for (const line of batch) {
+            if (line.trim()) {
+              try {
+                const data = JSON.parse(line);
+                if (data.header && data.balances) {
+                  blockCount++;
+                  balanceCount += data.balances.length;
+                  // Count whales in this block
+                  for (const balance of data.balances) {
+                    if (balance.account && balance.pre !== undefined && balance.post !== undefined) {
+                      const changeSol = Math.abs(Number(BigInt(balance.post) - BigInt(balance.pre))) / 1_000_000_000;
+                      if (changeSol >= 100) {
+                        whaleCount++;
+                      }
                     }
                   }
                 }
+                await this.processStreamItem(data);
+              } catch (error) {
+                console.error('Error parsing stream data:', error);
+                console.error('Line that failed:', line.substring(0, 100));
               }
-              await this.processStreamItem(data);
-            } catch (error) {
-              console.error('Error parsing stream data:', error);
-              console.error('Line that failed:', line.substring(0, 100));
             }
+          }
+          
+          // Small delay between batches to prevent overwhelming the system
+          if (i + batchSize < lines.length) {
+            await new Promise(resolve => setTimeout(resolve, 10));
           }
         }
       });
@@ -256,6 +304,7 @@ export class SQDApiClient extends EventEmitter {
             }
             
             if (isWhale) {
+              resourceMonitor.recordWhaleTransaction();
               await this.logWhaleTransaction(balance, changeSol, blockNumber, blockTimestamp, transactionMap, solPrice);
             }
             
@@ -299,6 +348,7 @@ export class SQDApiClient extends EventEmitter {
         
         // Log if it's a whale based on default threshold
         if (isWhale) {
+          resourceMonitor.recordWhaleTransaction();
           await this.logWhaleTransaction(data, changeSol, this.currentBlockHeight || 0, Date.now(), new Map(), solPrice);
         }
         
@@ -330,6 +380,11 @@ export class SQDApiClient extends EventEmitter {
     const txSignature = transaction?.signatures?.[0] || `tx_${balance.transactionIndex}`;
     
     if (this.loggedTransactions.has(txSignature)) {
+      return;
+    }
+    
+    // Only log if we have active users listening
+    if (!this.hasActiveUsers) {
       return;
     }
     
