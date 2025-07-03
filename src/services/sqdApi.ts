@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { BlockData, StreamData, TransactionData } from '../types';
 import { config } from '../utils/config';
 import { priceService } from './priceService';
+import { userSettingsService } from './userSettings';
 
 export class SQDApiClient extends EventEmitter {
   private baseUrl: string;
@@ -74,7 +75,7 @@ export class SQDApiClient extends EventEmitter {
     this.reconnectAttempts = 0;
     let currentBlock = fromBlock;
 
-    console.log('Starting 15-second polling interval...');
+    console.log('Starting dynamic refresh monitoring...');
 
     while (this.isStreaming) {
       try {
@@ -95,8 +96,8 @@ export class SQDApiClient extends EventEmitter {
           // No new blocks (stats available via /stats command)
         }
 
-        // Wait 15 seconds before next poll
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        const intervalSeconds = userSettingsService.getOptimalPollingInterval();
+        await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
         
       } catch (error) {
         console.error('Polling error:', error);
@@ -111,7 +112,7 @@ export class SQDApiClient extends EventEmitter {
         }
 
         this.reconnectAttempts++;
-        const delay = Math.min(this.reconnectAttempts * 5000, 30000); // Max 30s delay
+        const delay = Math.min(this.reconnectAttempts * 5000, 30000);
         console.log(`Retrying in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
         
         await new Promise(resolve => setTimeout(resolve, delay));

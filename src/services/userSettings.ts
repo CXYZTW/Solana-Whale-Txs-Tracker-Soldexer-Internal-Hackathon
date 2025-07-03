@@ -9,7 +9,8 @@ export class UserSettingsService {
     this.defaultSettings = {
       threshold: config.whaleThreshold,
       thresholdType: config.whaleThresholdType,
-      alertsEnabled: true
+      alertsEnabled: true,
+      pollingIntervalSeconds: config.defaultPollingIntervalSeconds
     };
   }
 
@@ -32,6 +33,17 @@ export class UserSettingsService {
     const settings = this.getUserSettings(userId);
     settings.threshold = threshold;
     settings.thresholdType = type;
+    this.userSettings.set(userId, settings);
+    return settings;
+  }
+
+  setPollingInterval(userId: number, intervalSeconds: number): UserSettings {
+    if (intervalSeconds < 1 || intervalSeconds > 300) {
+      throw new Error('Refresh interval must be between 1 and 300 seconds');
+    }
+    
+    const settings = this.getUserSettings(userId);
+    settings.pollingIntervalSeconds = intervalSeconds;
     this.userSettings.set(userId, settings);
     return settings;
   }
@@ -68,6 +80,27 @@ export class UserSettingsService {
     } else {
       return `$${settings.threshold.toLocaleString()} USD`;
     }
+  }
+
+  getPollingInterval(userId: number): number {
+    const settings = this.getUserSettings(userId);
+    return settings.pollingIntervalSeconds;
+  }
+
+  getOptimalPollingInterval(): number {
+    if (this.userSettings.size === 0) {
+      return config.defaultPollingIntervalSeconds;
+    }
+    
+    const intervals = Array.from(this.userSettings.values())
+      .filter(settings => settings.alertsEnabled)
+      .map(settings => settings.pollingIntervalSeconds);
+    
+    if (intervals.length === 0) {
+      return config.defaultPollingIntervalSeconds;
+    }
+    
+    return Math.min(...intervals);
   }
 }
 

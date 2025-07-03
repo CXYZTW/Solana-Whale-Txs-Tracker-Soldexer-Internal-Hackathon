@@ -9,6 +9,7 @@ async function main() {
     
     console.log('Starting Solana Whale Tracker Bot...');
     console.log(`Default whale threshold: ${config.whaleThresholdType === 'USD' ? '$' + config.whaleThreshold.toLocaleString() : config.whaleThreshold + ' SOL'}`);
+    console.log(`Default refresh interval: ${config.defaultPollingIntervalSeconds} seconds`);
     console.log(`Telegram token configured: ${config.telegramToken ? 'Yes' : 'No'}`);
     
     const sqdClient = new SQDApiClient(config.sqdApiUrl);

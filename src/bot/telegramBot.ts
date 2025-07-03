@@ -29,6 +29,8 @@ export class TelegramBot {
     this.bot.command('setthreshold', (ctx) => this.handleSetThreshold(ctx));
     this.bot.command('setsol', (ctx) => this.handleSetSolThreshold(ctx));
     this.bot.command('setusd', (ctx) => this.handleSetUsdThreshold(ctx));
+    this.bot.command('refresh', (ctx) => this.handleRefreshInterval(ctx));
+    this.bot.command('setrefresh', (ctx) => this.handleSetRefreshInterval(ctx));
     this.bot.command('alerts', (ctx) => this.handleAlerts(ctx));
     this.bot.command('help', (ctx) => this.handleHelp(ctx));
     
@@ -158,6 +160,57 @@ export class TelegramBot {
       { parse_mode: 'Markdown' }
     );
   }
+  
+  private async handleRefreshInterval(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+    
+    const currentInterval = userSettingsService.getPollingInterval(userId);
+    const optimalInterval = userSettingsService.getOptimalPollingInterval();
+    
+    const message = `⏱️ **Your refresh speed:** Every ${currentInterval} seconds\n\n` +
+      `🏃 **Current bot speed:** Every ${optimalInterval} seconds (fastest user setting)\n\n` +
+      `Use /setrefresh <seconds> to change how often you want updates (1-300s)`;
+    
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleSetRefreshInterval(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const parts = text.split(' ');
+    
+    if (parts.length !== 2) {
+      await ctx.reply('❌ Usage: `/setrefresh <seconds>`\nExample: `/setrefresh 5`', { parse_mode: 'Markdown' });
+      return;
+    }
+
+    const newInterval = parseInt(parts[1]);
+    if (isNaN(newInterval) || newInterval < 1 || newInterval > 300) {
+      await ctx.reply('❌ Please provide a number between 1 and 300 seconds.');
+      return;
+    }
+
+    try {
+      userSettingsService.setPollingInterval(userId, newInterval);
+      await ctx.reply(
+        `✅ Refresh speed set to **every ${newInterval} seconds**\n\n` +
+        `⚡ Faster = more up-to-date alerts\n` +
+        `🐌 Slower = less frequent checks`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      await ctx.reply('❌ ' + (error as Error).message);
+    }
+  }
 
   private async handleAlerts(ctx: Context) {
     const userId = ctx.from?.id;
@@ -183,6 +236,10 @@ export class TelegramBot {
 • /setsol <amount> - Set threshold in SOL (e.g., /setsol 100)
 • /setusd <amount> - Set threshold in USD (e.g., /setusd 15000)
 
+⏱️ **Data Freshness**
+• /refresh - View how often you get updates
+• /setrefresh <seconds> - Set update speed (1-300s)
+
 📊 **Information**
 • /stats - View whale statistics
 • /alerts - Toggle alerts on/off
@@ -191,6 +248,7 @@ export class TelegramBot {
 **Examples:**
 🔹 /setsol 50 - Get alerts for transactions ≥ 50 SOL
 🔹 /setusd 10000 - Get alerts for transactions ≥ $10,000
+🔹 /setrefresh 5 - Get updates every 5 seconds (super fast)
 `;
     
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
