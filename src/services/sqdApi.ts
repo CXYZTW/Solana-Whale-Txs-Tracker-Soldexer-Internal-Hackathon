@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { EventEmitter } from 'events';
-import { BlockData, StreamData, TransactionData } from '../types';
 import { config } from '../utils/config';
 import { priceService } from './priceService';
 import { userSettingsService } from './userSettings';
@@ -10,7 +9,6 @@ export class SQDApiClient extends EventEmitter {
   private isStreaming: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 10;
-  private reconnectDelay: number = 5000;
   private abortController?: AbortController;
   private currentBlockHeight?: number;
   private loggedTransactions: Set<string> = new Set();

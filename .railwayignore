@@ -1,0 +1,15 @@
+node_modules
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+README.md
+DEPLOY.md
+*.log
+.DS_Store
+.vscode
+.idea
+coverage
+.nyc_output
+whale_tracker_prd.md

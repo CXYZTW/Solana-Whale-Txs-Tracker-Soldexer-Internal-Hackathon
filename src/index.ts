@@ -2,12 +2,16 @@ import { SQDApiClient } from './services/sqdApi';
 import { WhaleDetector } from './services/whaleDetector';
 import { TelegramBot } from './bot/telegramBot';
 import { config, validateConfig } from './utils/config';
+import { startHealthServer } from './server';
 
 async function main() {
   try {
     validateConfig();
     
     console.log('Starting Solana Whale Tracker Bot...');
+    
+    // Start health server for Railway
+    startHealthServer();
     console.log(`Default whale threshold: ${config.whaleThresholdType === 'USD' ? '$' + config.whaleThreshold.toLocaleString() : config.whaleThreshold + ' SOL'}`);
     console.log(`Default refresh interval: ${config.defaultPollingIntervalSeconds} seconds`);
     console.log(`Telegram token configured: ${config.telegramToken ? 'Yes' : 'No'}`);
