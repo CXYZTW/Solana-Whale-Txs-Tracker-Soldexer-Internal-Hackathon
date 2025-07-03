@@ -131,8 +131,12 @@ export class WhaleDetector extends EventEmitter {
     this.stats.totalWhales++;
     this.stats.totalVolumeSol += whale.amountSol;
     
-    if (!this.stats.largestWhale || whale.amountSol > this.stats.largestWhale.amountSol) {
-      this.stats.largestWhale = whale;
+    // Only update largest whale if this is bigger (last 24h)
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    if (whale.timestamp >= oneDayAgo) {
+      if (!this.stats.largestWhale || whale.amountSol > this.stats.largestWhale.amountSol) {
+        this.stats.largestWhale = whale;
+      }
     }
     
     this.stats.averageWhaleSizeSol = this.stats.totalVolumeSol / this.stats.totalWhales;
@@ -146,11 +150,17 @@ export class WhaleDetector extends EventEmitter {
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
     let whales24h = 0;
     let volume24h = 0;
+    let largest24h: WhaleTransaction | null = null;
     
     for (const [sig, whale] of this.recentWhales.entries()) {
       if (whale.timestamp >= oneDayAgo) {
         whales24h++;
         volume24h += whale.amountSol;
+        
+        // Track largest in last 24h
+        if (!largest24h || whale.amountSol > largest24h.amountSol) {
+          largest24h = whale;
+        }
       } else {
         this.recentWhales.delete(sig);
       }
@@ -158,6 +168,7 @@ export class WhaleDetector extends EventEmitter {
     
     this.stats.last24hWhales = whales24h;
     this.stats.last24hVolume = volume24h;
+    this.stats.largestWhale = largest24h;
   }
 
   private startStatsCleanup() {

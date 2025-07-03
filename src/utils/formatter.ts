@@ -1,5 +1,4 @@
 import { WhaleTransaction, WhaleStats } from '../types';
-import { EMOJI, MESSAGES } from './constants';
 import { priceService } from '../services/priceService';
 
 export function formatSolAmount(lamports: bigint): string {
@@ -48,21 +47,36 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
 
 export function formatStats(stats: WhaleStats): string {
   if (stats.totalWhales === 0) {
-    return MESSAGES.STATS_HEADER + MESSAGES.NO_STATS;
+    return '**Whale Activity**\n\nNo whale transactions detected yet.\nI\'m monitoring the blockchain for large transfers.';
   }
   
-  return `${MESSAGES.STATS_HEADER}
-${EMOJI.WHALE} *Total Whales:* ${stats.totalWhales.toLocaleString()}
-${EMOJI.MONEY} *Total Volume:* ${stats.totalVolumeSol.toLocaleString()} SOL
-${EMOJI.CHART} *Average Size:* ${stats.averageWhaleSizeSol.toLocaleString()} SOL
-
-*Last 24 Hours:*
-${EMOJI.WHALE} *Whales:* ${stats.last24hWhales.toLocaleString()}
-${EMOJI.MONEY} *Volume:* ${stats.last24hVolume.toLocaleString()} SOL
-
-${stats.largestWhale ? `*Largest Whale Today:*
-${EMOJI.MONEY} ${formatSolAmount(stats.largestWhale.amountLamports)} SOL
-${EMOJI.INFO} \`${shortenAddress(stats.largestWhale.signature, 8)}\`` : ''}`;
+  
+  let message = '**Whale Activity Summary**\n\n';
+  
+  // Recent activity (most important)
+  message += '**Last 24 Hours**\n';
+  message += `Whale Transactions: ${stats.last24hWhales.toLocaleString()}\n`;
+  message += `Total Volume: ${stats.last24hVolume.toLocaleString()} SOL\n`;
+  message += `USD Value: ${priceService.formatUsdValue(stats.last24hVolume)}\n\n`;
+  
+  // Activity rate
+  const avgPerHour = Math.round(stats.last24hWhales / 24 * 10) / 10;
+  message += `Average: ${avgPerHour} whales per hour\n\n`;
+  
+  // Largest recent whale
+  if (stats.largestWhale) {
+    message += '**Biggest Recent Whale**\n';
+    message += `${formatSolAmount(stats.largestWhale.amountLamports)} SOL\n`;
+    message += `${priceService.formatUsdValue(stats.largestWhale.amountSol)}\n\n`;
+  }
+  
+  // All-time stats
+  message += '**All-Time Stats**\n';
+  message += `Total Detected: ${stats.totalWhales.toLocaleString()}\n`;
+  message += `Average Size: ${Math.round(stats.averageWhaleSizeSol).toLocaleString()} SOL\n`;
+  message += `Average Value: ${priceService.formatUsdValue(stats.averageWhaleSizeSol)}`;
+  
+  return message;
 }
 
 export function formatTimeAgo(timestamp: number): string {
