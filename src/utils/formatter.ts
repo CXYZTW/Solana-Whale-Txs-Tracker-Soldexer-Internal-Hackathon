@@ -1,5 +1,6 @@
 import { WhaleTransaction, WhaleStats } from '../types';
 import { EMOJI, MESSAGES } from './constants';
+import { priceService } from '../services/priceService';
 
 export function formatSolAmount(lamports: bigint): string {
   const sol = Number(lamports) / 1_000_000_000;
@@ -18,24 +19,32 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   const direction = isReceiving ? 'RECEIVED' : 'SENT';
   
   // Check if signature looks like a real transaction hash
-  const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_');
-  
-  let message = `🐋 **WHALE DETECTED: ${amount} SOL**\n\n`;
-  
-  message += `💸 **${direction}**\n`;
-  message += `Account: \`${shortenAddress(mainAddress)}\`\n`;
-  message += `Amount: **${amount} SOL**\n`;
-  
-  if (hasRealSignature) {
-    message += `\n🔗 **Transaction**\n`;
-    message += `[View on Solscan](https://solscan.io/tx/${whale.signature})`;
-  } else {
-    message += `\n📍 **Account Details**\n`;
-    message += `[View on Solscan](https://solscan.io/account/${mainAddress})`;
-  }
+  const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_') && !whale.signature.includes('balance_change_');
   
   const timeAgo = formatTimeAgo(whale.timestamp);
-  message += `\n\n⏰ ${timeAgo}`;
+  const date = new Date(whale.timestamp);
+  
+  // Calculate USD value using actual SOL price
+  const usdValue = priceService.formatUsdValue(parseFloat(amount.replace(/,/g, '')));
+  
+  let message = `🐋 **WHALE TRANSACTION DETECTED: ${Math.round(parseFloat(amount.replace(/,/g, '')))} SOL**\n\n`;
+  message += `==================================================\n\n`;
+  message += `📋 **Transaction Details**\n\n`;
+  message += `   Timestamp: ${timeAgo} (${date.toUTCString()})\n`;
+  
+  if (hasRealSignature) {
+    message += `   Tx: \`${whale.signature}\`\n`;
+    message += `   Link: [solscan.io/tx/${whale.signature}](https://solscan.io/tx/${whale.signature})\n\n`;
+  } else {
+    message += `\n`;
+  }
+  
+  message += `💸 **Transfer**\n\n`;
+  message += `   ${direction === 'RECEIVED' ? 'Receiver' : 'Account'}: \`${mainAddress}\`\n`;
+  message += `   Link: [solscan.io/account/${mainAddress}](https://solscan.io/account/${mainAddress})\n`;
+  message += `   Amount: ${amount} SOL\n`;
+  message += `   USD Value: ${usdValue}\n\n`;
+  message += `==========================================`;
   
   return message;
 }
