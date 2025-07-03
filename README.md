@@ -1,6 +1,6 @@
 # Solana Whale Tracker Telegram Bot
 
-A real-time Telegram bot that monitors and alerts users about large SOL transfers (whale transactions) on the Solana blockchain.
+A real-time Telegram bot that monitors and alerts users about large SOL transfers (whale transactions) on Solana.
 
 ## Features
 
@@ -9,9 +9,7 @@ A real-time Telegram bot that monitors and alerts users about large SOL transfer
 - 👤 User-specific threshold settings
 - 📊 Comprehensive whale statistics
 - 🔔 Instant Telegram notifications
-- ⚙️ Configurable whale threshold per user
 - 🔄 Automatic reconnection and error handling
-- 📈 24-hour statistics tracking
 
 ## Prerequisites
 
@@ -48,21 +46,6 @@ SOLDEXER_API_URL=https://portal.sqd.dev/datasets/solana-mainnet
 WHALE_THRESHOLD=50000
 ENABLE_ALERTS=true
 ALERT_COOLDOWN_MINUTES=5
-```
-
-## Usage
-
-### Development Mode
-
-```bash
-npm run dev
-```
-
-### Production Mode
-
-```bash
-npm run build
-npm start
 ```
 
 ### Available Scripts
