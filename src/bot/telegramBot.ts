@@ -338,7 +338,7 @@ Reply **custom** to set your own amount`;
       case 'custom':
         state.step = 'custom_amount';
         this.onboardingState.set(userId, state);
-        await ctx.reply('**Custom Threshold**\n\nEnter your desired amount in USD or SOL:\n\n**For USD:** Type the dollar amount\nExample: **50000** (for $50,000)\nExample: **250000** (for $250,000)\n\n**For SOL:** Type the amount with "SOL"\nExample: **100 SOL**\nExample: **500 SOL**', { parse_mode: 'Markdown' });
+        await ctx.reply('**Custom Threshold**\n\nChoose your format:\n\n**Option 1 - USD Amount:**\nType: **$50000** or **50000 USD**\nExamples: $25000, $250000, 75000 USD\n\n**Option 2 - SOL Amount:**\nType: **100 SOL** or **SOL 500**\nExamples: 50 SOL, SOL 200, 1000 SOL', { parse_mode: 'Markdown' });
         return;
       default:
         await ctx.reply('Please reply with **1**, **2**, **3**, or **custom**');
@@ -359,25 +359,26 @@ Reply **custom** to set your own amount`;
     let amount: number;
     let currency: 'USD' | 'SOL';
     
-    // Check if input contains "sol"
+    // Parse different formats
     if (inputLower.includes('sol')) {
+      // SOL format: "100 SOL", "SOL 500", "250SOL"
       const numberPart = inputLower.replace(/[^0-9.]/g, '');
       amount = parseFloat(numberPart);
       currency = 'SOL';
-      
-      if (isNaN(amount) || amount <= 0) {
-        await ctx.reply('Please enter a valid SOL amount like: **100 SOL** or **500 SOL**', { parse_mode: 'Markdown' });
-        return;
-      }
-    } else {
-      // Assume USD if no "sol" specified
-      amount = parseFloat(inputLower);
+    } else if (inputLower.includes('usd') || inputLower.startsWith('$')) {
+      // USD format: "$50000", "50000 USD", "75000usd"
+      const numberPart = inputLower.replace(/[^0-9.]/g, '');
+      amount = parseFloat(numberPart);
       currency = 'USD';
-      
-      if (isNaN(amount) || amount <= 0) {
-        await ctx.reply('Please enter a valid amount like: **50000** (for $50,000) or **100 SOL**', { parse_mode: 'Markdown' });
-        return;
-      }
+    } else {
+      // Ambiguous number - ask for clarification
+      await ctx.reply('**Please specify the currency:**\n\nFor USD, type: **$' + input + '** or **' + input + ' USD**\nFor SOL, type: **' + input + ' SOL**\n\nOr try again with a clear format like:\n$50000, 100 SOL, 25000 USD', { parse_mode: 'Markdown' });
+      return;
+    }
+    
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply('**Invalid amount**\n\nPlease use one of these formats:\n$50000 (for USD)\n100 SOL (for Solana)\n25000 USD (for USD)', { parse_mode: 'Markdown' });
+      return;
     }
     
     // Skip currency choice since we already determined it
