@@ -73,8 +73,8 @@ ALERT_COOLDOWN_MINUTES=5
 
 - `/setsol 50` - Get alerts for transactions ≥ 50 SOL
 - `/setusd 10000` - Get alerts for transactions ≥ $10,000 USD
-- `/setrefresh 5` - Get updates every 5 seconds (super fast)
-- `/setrefresh 60` - Get updates every minute (relaxed)
+- `/setrefresh 5` - Get updates every 5 seconds
+- `/setrefresh 60` - Get updates every minute
 
 ## Architecture
 
