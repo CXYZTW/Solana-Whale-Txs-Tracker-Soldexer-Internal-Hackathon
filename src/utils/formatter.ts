@@ -16,8 +16,12 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   const isReceiving = whale.fromAddress === 'Unknown';
   const mainAddress = isReceiving ? whale.toAddress : whale.fromAddress;
   
-  // Check if signature looks like a real transaction hash
-  const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_') && !whale.signature.includes('balance_change_');
+  // Check if signature looks like a real transaction hash (Solana tx hashes are 88 chars)
+  const hasRealSignature = whale.signature && 
+                          whale.signature.length >= 80 && 
+                          !whale.signature.includes('block_') && 
+                          !whale.signature.includes('balance_change_') &&
+                          /^[1-9A-HJ-NP-Za-km-z]+$/.test(whale.signature); // Base58 check
   
   const timeAgo = formatTimeAgo(whale.timestamp);
   
@@ -36,9 +40,12 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   if (hasRealSignature) {
     message += `\n🔗 [View Transaction](https://solscan.io/tx/${whale.signature})`;
   } else {
-    // If no real signature, show account link but label it as transaction for consistency
-    message += `\n🔗 [View Transaction](https://solscan.io/account/${mainAddress})`;
+    // If no real signature, be honest about it being an account link
+    message += `\n🔗 [View Account](https://solscan.io/account/${mainAddress})`;
   }
+  
+  // Debug info (remove later)
+  console.log(`🔍 Whale alert: signature=${whale.signature}, hasReal=${hasRealSignature}, address=${mainAddress}`);
   
   message += `\n⏰ ${timeAgo}`;
   

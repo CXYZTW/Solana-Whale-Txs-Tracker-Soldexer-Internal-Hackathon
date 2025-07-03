@@ -308,20 +308,28 @@ export class SQDApiClient extends EventEmitter {
               await this.logWhaleTransaction(balance, changeSol, blockNumber, blockTimestamp, transactionMap, solPrice);
             }
             
-            // Always emit balance change for whale detection
+            // Only emit ONE whale event per transaction (use the larger amount)
             const transactionForBalance = transactionMap.get(balance.transactionIndex);
             const realSignature = transactionForBalance?.signatures?.[0];
             
-            this.emit('balanceChange', {
-              account: balance.account,
-              change: balanceChange,
-              preBalance: preBalance,
-              postBalance: postBalance,
-              signature: realSignature || `balance_change_${blockNumber}_${balance.account.slice(-8)}`,
-              blockHeight: blockNumber,
-              timestamp: blockTimestamp,
-              transaction: transactionForBalance || balance
-            });
+            if (realSignature && isWhale) {
+              // Check if we already processed this transaction
+              const txKey = `${realSignature}_${blockNumber}`;
+              if (!this.loggedTransactions.has(txKey)) {
+                this.loggedTransactions.add(txKey);
+                
+                this.emit('balanceChange', {
+                  account: balance.account,
+                  change: balanceChange,
+                  preBalance: preBalance,
+                  postBalance: postBalance,
+                  signature: realSignature,
+                  blockHeight: blockNumber,
+                  timestamp: blockTimestamp,
+                  transaction: transactionForBalance
+                });
+              }
+            }
           }
         }
       }
