@@ -13,6 +13,7 @@ export class TelegramBot {
   private alertsEnabled: boolean = true;
   private subscribedChats: Set<number> = new Set();
   private adminIds: Set<number> = new Set();
+  private sentAlerts: Set<string> = new Set();
 
   constructor(token: string, whaleDetector: WhaleDetector) {
     this.bot = new Telegraf(token);
@@ -374,6 +375,21 @@ Or customize manually:
   }
 
   private async broadcastWhaleAlert(whale: WhaleTransaction) {
+    const alertKey = `${whale.signature}_${whale.blockHeight}`;
+    
+    // Prevent duplicate alerts
+    if (this.sentAlerts.has(alertKey)) {
+      console.log(`⏭️ Duplicate alert blocked: ${whale.signature}`);
+      return;
+    }
+    this.sentAlerts.add(alertKey);
+    
+    // Clean old alerts (keep only last 1000)
+    if (this.sentAlerts.size > 1000) {
+      const alerts = Array.from(this.sentAlerts);
+      alerts.slice(0, 500).forEach(key => this.sentAlerts.delete(key));
+    }
+    
     const solPrice = priceService.getSolPrice();
     const activeUsers = userSettingsService.getAllActiveUsers();
     

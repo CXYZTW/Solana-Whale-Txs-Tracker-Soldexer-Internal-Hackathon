@@ -22,29 +22,23 @@ export function formatWhaleAlert(whale: WhaleTransaction): string {
   const hasRealSignature = whale.signature && whale.signature.length > 20 && !whale.signature.includes('block_') && !whale.signature.includes('balance_change_');
   
   const timeAgo = formatTimeAgo(whale.timestamp);
-  const date = new Date(whale.timestamp);
   
   // Calculate USD value using actual SOL price
   const usdValue = priceService.formatUsdValue(parseFloat(amount.replace(/,/g, '')));
   
-  let message = `🐋 **WHALE TRANSACTION DETECTED: ${Math.round(parseFloat(amount.replace(/,/g, '')))} SOL**\n\n`;
-  message += `==================================================\n\n`;
-  message += `📋 **Transaction Details**\n\n`;
-  message += `   Timestamp: ${timeAgo} (${date.toUTCString()})\n`;
+  let message = `🐋 **WHALE: ${Math.round(parseFloat(amount.replace(/,/g, '')))} SOL**\n\n`;
+  
+  message += `💰 **Amount:** ${amount} SOL\n`;
+  message += `💵 **Value:** ${usdValue}\n`;
+  message += `📍 **${direction === 'RECEIVED' ? 'Receiver' : 'Account'}:** \`${shortenAddress(mainAddress)}\`\n`;
   
   if (hasRealSignature) {
-    message += `   Tx: \`${whale.signature}\`\n`;
-    message += `   Link: [solscan.io/tx/${whale.signature}](https://solscan.io/tx/${whale.signature})\n\n`;
+    message += `\n🔗 [View Transaction](https://solscan.io/tx/${whale.signature})`;
   } else {
-    message += `\n`;
+    message += `\n🔗 [View Account](https://solscan.io/account/${mainAddress})`;
   }
   
-  message += `💸 **Transfer**\n\n`;
-  message += `   ${direction === 'RECEIVED' ? 'Receiver' : 'Account'}: \`${mainAddress}\`\n`;
-  message += `   Link: [solscan.io/account/${mainAddress}](https://solscan.io/account/${mainAddress})\n`;
-  message += `   Amount: ${amount} SOL\n`;
-  message += `   USD Value: ${usdValue}\n\n`;
-  message += `==========================================`;
+  message += `\n⏰ ${timeAgo}`;
   
   return message;
 }
