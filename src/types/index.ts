@@ -49,7 +49,6 @@ export interface BotConfig {
   whaleThreshold: number;
   whaleThresholdType: 'SOL' | 'USD';
   enableAlerts: boolean;
-  alertCooldownMinutes: number;
   defaultPollingIntervalSeconds: number;
 }
 

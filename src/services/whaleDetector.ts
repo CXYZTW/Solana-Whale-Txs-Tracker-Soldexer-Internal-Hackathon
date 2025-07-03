@@ -101,9 +101,8 @@ export class WhaleDetector extends EventEmitter {
   }
 
   private shouldAlert(whale: WhaleTransaction): boolean {
-    // Use signature as primary key to prevent exact duplicates
+    // Only prevent exact duplicate transactions by signature
     const signatureKey = whale.signature;
-    const cooldownKey = `${whale.fromAddress}-${whale.toAddress}`;
     
     // Check for exact duplicate by signature
     if (this.cooldownMap.has(signatureKey)) {
@@ -111,19 +110,8 @@ export class WhaleDetector extends EventEmitter {
       return false;
     }
     
-    const lastAlert = this.cooldownMap.get(cooldownKey);
-    const now = Date.now();
-    const cooldownMs = config.alertCooldownMinutes * 60 * 1000;
-    
-    if (lastAlert && now - lastAlert < cooldownMs) {
-      const remainingMs = cooldownMs - (now - lastAlert);
-      console.log(`⏳ Cooldown active for ${cooldownKey}, ${Math.round(remainingMs/1000)}s remaining`);
-      return false;
-    }
-    
-    // Store both signature and address pair
-    this.cooldownMap.set(signatureKey, now);
-    this.cooldownMap.set(cooldownKey, now);
+    // Store signature to prevent exact duplicates
+    this.cooldownMap.set(signatureKey, Date.now());
     return true;
   }
 
@@ -175,13 +163,11 @@ export class WhaleDetector extends EventEmitter {
     setInterval(() => {
       this.updateLast24hStats();
       
-      const now = Date.now();
-      const cooldownMs = config.alertCooldownMinutes * 60 * 1000;
-      
-      for (const [key, timestamp] of this.cooldownMap.entries()) {
-        if (now - timestamp > cooldownMs) {
-          this.cooldownMap.delete(key);
-        }
+      // Clean up old signatures (keep only last 1000 to prevent memory leak)
+      if (this.cooldownMap.size > 1000) {
+        const entries = Array.from(this.cooldownMap.entries());
+        const oldestEntries = entries.slice(0, 500);
+        oldestEntries.forEach(([key]) => this.cooldownMap.delete(key));
       }
     }, 60 * 1000);
   }
