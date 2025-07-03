@@ -2,7 +2,6 @@ import { Telegraf, Context } from 'telegraf';
 import { WhaleDetector } from '../services/whaleDetector';
 import { WhaleTransaction } from '../types';
 import { formatWhaleAlert, formatStats } from '../utils/formatter';
-import { MESSAGES } from '../utils/constants';
 import { config } from '../utils/config';
 import { userSettingsService } from '../services/userSettings';
 import { priceService } from '../services/priceService';
@@ -24,6 +23,9 @@ export class TelegramBot {
 
   private setupCommands() {
     this.bot.command('start', (ctx) => this.handleStart(ctx));
+    this.bot.command('quick5', (ctx) => this.handleQuickSetup(ctx, 5000, 'USD'));
+    this.bot.command('quick25', (ctx) => this.handleQuickSetup(ctx, 25000, 'USD'));
+    this.bot.command('quick100', (ctx) => this.handleQuickSetup(ctx, 100000, 'USD'));
     this.bot.command('stats', (ctx) => this.handleStats(ctx));
     this.bot.command('threshold', (ctx) => this.handleThreshold(ctx));
     this.bot.command('setthreshold', (ctx) => this.handleSetThreshold(ctx));
@@ -51,17 +53,68 @@ export class TelegramBot {
 
   private async handleStart(ctx: Context) {
     const chatId = ctx.chat?.id;
+    const userId = ctx.from?.id;
+    
     if (chatId) {
       this.subscribedChats.add(chatId);
       
-      // Check if user is admin (you can add your admin user IDs here)
-      const userId = ctx.from?.id;
       if (userId && this.isAdmin(userId)) {
         this.adminIds.add(userId);
       }
     }
     
-    await ctx.reply(MESSAGES.WELCOME, { parse_mode: 'Markdown' });
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+    
+    // Check if user is new (using default settings)
+    const settings = userSettingsService.getUserSettings(userId);
+    const isNewUser = settings.threshold === config.whaleThreshold && settings.thresholdType === config.whaleThresholdType;
+    
+    if (isNewUser) {
+      await this.handleNewUserOnboarding(ctx, userId);
+    } else {
+      await this.handleReturningUser(ctx, userId);
+    }
+  }
+  
+  private async handleNewUserOnboarding(ctx: Context, _userId: number) {
+    const welcomeMessage = `🐋 **Welcome to Solana Whale Tracker!**
+
+💰 I'll alert you when large SOL transactions happen on the blockchain.
+
+**Quick Setup** (choose one):
+
+🔥 /quick5 - Get alerts for $5,000+ transactions (active)
+💪 /quick25 - Get alerts for $25,000+ transactions (balanced)
+🐋 /quick100 - Get alerts for $100,000+ transactions (whales only)
+
+Or customize manually:
+• /setusd <amount> - Set your own USD threshold
+• /setsol <amount> - Set your own SOL threshold
+
+🚀 **Choose a quick option above to start immediately!**`;
+    
+    await ctx.reply(welcomeMessage, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleReturningUser(ctx: Context, userId: number) {
+    const settings = userSettingsService.getUserSettings(userId);
+    const thresholdStr = userSettingsService.formatThreshold(userId);
+    const refreshInterval = userSettingsService.getPollingInterval(userId);
+    
+    const welcomeBackMessage = `🐋 **Welcome back!**
+
+✅ **Your current settings:**
+🎯 Threshold: ${thresholdStr}
+⏱️ Updates: Every ${refreshInterval} seconds
+🔔 Alerts: ${settings.alertsEnabled ? 'ON' : 'OFF'}
+
+📊 Use /stats to see recent whale activity
+⚙️ Use /help for all commands`;
+    
+    await ctx.reply(welcomeBackMessage, { parse_mode: 'Markdown' });
   }
 
   private async handleStats(ctx: Context) {
@@ -252,6 +305,40 @@ export class TelegramBot {
 `;
     
     await ctx.reply(helpText, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleQuickSetup(ctx: Context, amount: number, type: 'SOL' | 'USD') {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+
+    try {
+      userSettingsService.setThreshold(userId, amount, type);
+      userSettingsService.setPollingInterval(userId, 15); // Set reasonable default
+      
+      const setupMessage = `✅ **Perfect! You're all set up!**
+
+` +
+        `💰 **Whale Alert Threshold:** $${amount.toLocaleString()} USD
+` +
+        `⏱️ **Update Speed:** Every 15 seconds
+` +
+        `🔔 **Alerts:** Enabled
+
+` +
+        `🚀 **You'll now receive alerts for transactions ≥ $${amount.toLocaleString()}**
+
+` +
+        `⚙️ Want to adjust? Use /setusd or /setrefresh
+` +
+        `📊 See activity with /stats`;
+      
+      await ctx.reply(setupMessage, { parse_mode: 'Markdown' });
+    } catch (error) {
+      await ctx.reply('❌ Setup failed: ' + (error as Error).message);
+    }
   }
 
   private async broadcastWhaleAlert(whale: WhaleTransaction) {
