@@ -36,6 +36,8 @@ export class TelegramBot {
     this.bot.command('refresh', (ctx) => this.handleRefreshInterval(ctx));
     this.bot.command('setrefresh', (ctx) => this.handleSetRefreshInterval(ctx));
     this.bot.command('alerts', (ctx) => this.handleAlerts(ctx));
+    this.bot.command('stop', (ctx) => this.handleStop(ctx));
+    this.bot.command('reset', (ctx) => this.handleReset(ctx));
     this.bot.command('usage', (ctx) => this.handleUsage(ctx));
     this.bot.command('help', (ctx) => this.handleHelp(ctx));
     
@@ -280,6 +282,33 @@ Or customize manually:
     const message = `🔔 Whale alerts **${status}** for your account.`;
     await ctx.reply(message, { parse_mode: 'Markdown' });
   }
+  
+  private async handleStop(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+    
+    userSettingsService.toggleAlerts(userId, false);
+    
+    const message = `🛑 **Alerts Stopped**\n\nYou will no longer receive whale transaction alerts.\n\n💡 To resume: /alerts\n📊 View stats: /stats\n🔧 Change settings: /help`;
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  }
+  
+  private async handleReset(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) {
+      await ctx.reply('Unable to identify user.');
+      return;
+    }
+    
+    // Reset user to default settings
+    userSettingsService.resetUserSettings(userId);
+    
+    const message = `🔄 **Settings Reset**\n\nYour settings have been reset to defaults:\n\n🎯 Threshold: $50,000 USD\n⏱️ Refresh: 15 seconds\n🔔 Alerts: Enabled\n\n🚀 Use quick setup commands to get started:\n• /quick5 - $5,000+ alerts\n• /quick25 - $25,000+ alerts\n• /quick100 - $100,000+ alerts`;
+    await ctx.reply(message, { parse_mode: 'Markdown' });
+  }
 
   private async handleUsage(ctx: Context) {
     const userId = ctx.from?.id;
@@ -326,9 +355,11 @@ Or customize manually:
 • /refresh - View how often you get updates
 • /setrefresh <seconds> - Set update speed (1-300s)
 
-📊 **Information**
+📊 **Information & Control**
 • /stats - View whale statistics
 • /alerts - Toggle alerts on/off
+• /stop - Stop all alerts
+• /reset - Reset to default settings
 • /help - Show this help message
 
 **Examples:**

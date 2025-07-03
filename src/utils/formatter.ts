@@ -69,13 +69,27 @@ export function formatTimeAgo(timestamp: number): string {
   const diffMinutes = Math.floor(diffSeconds / 60);
   const diffHours = Math.floor(diffMinutes / 60);
   
+  // Format CET time
+  const date = new Date(timestamp);
+  const cetTime = date.toLocaleString('en-GB', {
+    timeZone: 'Europe/Berlin',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    day: '2-digit',
+    month: '2-digit'
+  });
+  
+  let timeAgo = '';
   if (diffHours > 0) {
-    return `${diffHours}h ${diffMinutes % 60}m ago`;
+    timeAgo = `${diffHours}h ${diffMinutes % 60}m ago`;
   } else if (diffMinutes > 0) {
-    return `${diffMinutes}m ago`;
+    timeAgo = `${diffMinutes}m ago`;
   } else {
-    return `${diffSeconds}s ago`;
+    timeAgo = `${diffSeconds}s ago`;
   }
+  
+  return `${timeAgo} (${cetTime} CET)`;
 }
 
 export function escapeMarkdown(text: string): string {

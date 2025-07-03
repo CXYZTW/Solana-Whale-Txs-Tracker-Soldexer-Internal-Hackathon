@@ -48,11 +48,21 @@ export class UserSettingsService {
     return settings;
   }
 
-  toggleAlerts(userId: number): boolean {
+  toggleAlerts(userId: number, forceState?: boolean): boolean {
     const settings = this.getUserSettings(userId);
-    settings.alertsEnabled = !settings.alertsEnabled;
+    if (forceState !== undefined) {
+      settings.alertsEnabled = forceState;
+    } else {
+      settings.alertsEnabled = !settings.alertsEnabled;
+    }
     this.userSettings.set(userId, settings);
     return settings.alertsEnabled;
+  }
+  
+  resetUserSettings(userId: number): UserSettings {
+    // Remove existing settings to get fresh defaults
+    this.userSettings.delete(userId);
+    return this.getUserSettings(userId); // This will create new default settings
   }
 
   getAllActiveUsers(): number[] {
